@@ -1,8 +1,6 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "hardhat/console.sol";
-
 contract Ownable{
 
   address public owner;
@@ -104,10 +102,6 @@ contract MyERC20 is Ownable{
     require(_allowances[msg.sender][_spender] >= _value, "Allowance is less than zero!");
     _allowances[msg.sender][_spender] -= _value;
     emit Approval(msg.sender, _spender, allowance(msg.sender, _spender));
- }
-
- fallback()external{
-  console.log(msg.sender, "fallback");
  }
 
 }

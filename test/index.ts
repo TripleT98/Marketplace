@@ -74,6 +74,10 @@ describe("Testing marketplace functions", function () {
     expect(await marketplace.getFee()).to.equal(new_fee);
   })
 
+  it("Testing getERC721Address function", async()=>{
+    expect(await marketplace.getERC721Address()).to.equal(erc721_address);
+  })
+
   it("Testing createNewItem function", async()=>{
 
     await marketplace.connect(owner).createNewItem(getUri(0));

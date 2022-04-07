@@ -4,26 +4,33 @@
 // When running the script with `npx hardhat run <script>` you'll find the Hardhat
 // Runtime Environment's members available in the global scope.
 import { ethers } from "hardhat";
+import web3 from "web3";
 
 async function main() {
-  // Hardhat always runs the compile task when running scripts with its command
-  // line interface.
-  //
-  // If this script is run directly using `node` you may want to call compile
-  // manually to make sure everything is compiled
-  // await hre.run('compile');
 
-  // We get the contract to deploy
+  let adminRole: string = web3.utils.keccak256("admin"),
+  name: string = "Masterpeace",
+  symbol: string = "MNFT",
+  currency: string;
+
+
+  const MyERC20 = await ethers.getContractFactory("MyERC20");
+  const myERC20 = await MyERC20.deploy();
+
+  await myERC20.deployed();
+  currency = myERC20.address;
+  console.log("ERC20 deployed to:", currency);
+
+
   const Marketplace = await ethers.getContractFactory("Marketplace");
-  const marketplace = await Marketplace.deploy("Hello, Hardhat!");
+  const marketplace = await Marketplace.deploy(name, symbol, adminRole, currency);
 
   await marketplace.deployed();
 
   console.log("Marketplace deployed to:", marketplace.address);
 }
 
-// We recommend this pattern to be able to use async/await everywhere
-// and properly handle errors.
+
 main().catch((error) => {
   console.error(error);
   process.exitCode = 1;

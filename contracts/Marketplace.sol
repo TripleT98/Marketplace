@@ -1,7 +1,6 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.0;
 
-import "hardhat/console.sol";
 import "./myERC721.sol";
 
 
@@ -63,6 +62,7 @@ contract Marketplace{
   function getFee() view public returns(uint){
     return fee;
   }
+
 
   function setFee(uint _fee) public OnlyOwner{
     fee = _fee;
