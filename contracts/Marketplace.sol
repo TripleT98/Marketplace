@@ -34,11 +34,16 @@ contract Marketplace{
   event ItemCreated(address indexed owner, uint indexed tokenId, string tokenURL);
   event Buy(address indexed customer, uint indexed tokenId, uint price);
   event ItemListed(address indexed owner, uint indexed tokenId, uint price);
-  event Cancled(address indexed owner, uint indexed tokenId);
+  event canceled(address indexed owner, uint indexed tokenId);
   event AuctionStarts(address indexed owner, uint indexed tokenId, uint startedPrice);
   event Bid(address indexed bidder, uint indexed tokenId, uint betValue);
   event AuctionFinished(address indexed seller, address indexed customer, uint indexed tokenId, uint price);
-  event AuctionCancled(address indexed owner, uint indexed tokenId);
+  event Auctioncanceled(address indexed owner, uint indexed tokenId);
+
+  modifier IsOnSale(uint _tokenId){
+    require(listing[_tokenId].owner != address(0), "Error: This item isn't on sell!");
+    _;
+  }
 
   modifier OnlyOwner(){
     require(msg.sender == owner, "Error: You are not owner!");
@@ -49,6 +54,10 @@ contract Marketplace{
     NFT = new MyERC721(_name, _symbol, _adminRole);
     currency = _currency;
     owner = msg.sender;
+  }
+
+  function getERC721Address() view public returns (address) {
+    return NFT.getAddress();
   }
 
   function getFee() view public returns(uint){
@@ -69,6 +78,14 @@ contract Marketplace{
     }
   }
 
+  function getOwner(uint _tokenId) view public returns (address) {
+    return NFT.ownerOf(_tokenId);
+  }
+
+  function getTokenURI(uint _tokenId) view public returns (string memory) {
+    return NFT.getTokenURI(_tokenId);
+  }
+
   function listItem(uint _tokenId, uint _price) public {
 
     _transferFromERC721(msg.sender, address(this), _tokenId);
@@ -82,26 +99,30 @@ contract Marketplace{
 
   function getPriceOfListedItem(uint _tokenId) view public returns (uint){
 
-    require(listing[_tokenId].price != 0, "Error: Tis token isn't for sale!");
+    require(listing[_tokenId].price != 0, "Error: This token isn't for sale!");
     return listing[_tokenId].price;
 
   }
 
   function _transferERC20(address _to, uint _amount) internal {
-    currency.call(abi.encodeWithSignature("transfer(address, uint)", _to, _amount));
+
+    (bool success,) = currency.call(abi.encodeWithSignature("transfer(address,uint256)", _to, _amount));
+    require(success, "Error: Can't transfer your token! Something is wrong!");
+
   }
 
   function _transferERC721(address _to, uint _tokenId) internal {
+
     NFT.transfer(_to, _tokenId);
+
   }
 
   function _transferFromERC20(address _from, address _to, uint _amount) internal {
-     (, bytes memory data) = currency.call(abi.encodeWithSignature("allowance(address, address)", _from, _to));
-     uint allowance = abi.decode(data, (uint));
-
-     require(allowance >= _amount, "Error: Please approve some tokens to this contract first!");
-     currency.call(abi.encodeWithSignature("transferFrom(address, address, uint)", _from, _to, _amount));
-
+     (bool success, bytes memory data) = currency.call(abi.encodeWithSignature("allowance(address,address)", _from, _to));
+     uint allowance = abi.decode(data,(uint));
+     require(allowance >= _amount, "Error: To buy item you have to allow to withdraw some tokens!");
+     (success,) = currency.call(abi.encodeWithSignature("transferFrom(address,address,uint256)", _from, _to, _amount));
+     require(success, "Error: Can't transferFrom your token! Something is wrong!");
   }
 
   function _transferFromERC721(address _from, address _to, uint _tokenId) internal {
@@ -113,18 +134,22 @@ contract Marketplace{
 
   }
 
-  function buyItem(uint _tokenId) public {
+
+
+  function buyItem(uint _tokenId) public IsOnSale(_tokenId){
     _transferFromERC20(msg.sender, address(this), listing[_tokenId].price);
+    NFT.transfer(msg.sender, _tokenId);
+    uint pay = listing[_tokenId].price - (listing[_tokenId].price/100)*fee;
+    _transferERC20(listing[_tokenId].owner,  pay);
     emit Buy(msg.sender, _tokenId, listing[_tokenId].price);
   }
 
-  function cancle(uint _tokenId) public {
-
-    require(listing[_tokenId].owner == msg.sender, "Error: You are not owner of this token!");
+  function cancel(uint _tokenId) public IsOnSale(_tokenId){
+    require(listing[_tokenId].owner == msg.sender, "Error: You can't cancel this sale because are not owner of this token!");
     delete listing[_tokenId];
     NFT.transfer(msg.sender, _tokenId);
 
-    emit Cancled(msg.sender, _tokenId);
+    emit canceled(msg.sender, _tokenId);
 
   }
 
@@ -139,12 +164,22 @@ contract Marketplace{
     emit AuctionStarts(msg.sender, _tokenId, _startedPrice);
   }
 
+  function getAuction(uint _tokenId) public view returns (Auction memory){
+    return auction[_tokenId];
+  }
+
   function makeBid(uint _tokenId, uint bet) public {
     Auction storage auctionParams = auction[_tokenId];
     require(auctionParams.owner != address(0), "Error: Sorry, but this token isn't on sale!");
-    require(auctionParams.currentPrice + auctionParams.minOdds <= bet, "Error: You bet is lower than current price. Please increase you bet!");
+    if(auction[_tokenId].startedTime + auctionDuration <= block.timestamp){
+      _finishAuction(_tokenId);
+      revert("Sorry but auction is already finished!");
+    }
     if(auctionParams.bidder != address(0)){
+      require(auctionParams.currentPrice + auctionParams.minOdds <= bet, "Error: You bet is lower than current price. Please increase you bet!");
       _transferERC20(auctionParams.bidder, auctionParams.currentPrice);
+    }else{
+      require(auctionParams.currentPrice <= bet, "Error: You bet is lower than current price. Please increase you bet!");
     }
      _transferFromERC20(msg.sender, address(this), bet);
      auctionParams.bidder = msg.sender;
@@ -156,19 +191,23 @@ contract Marketplace{
   }
 
   function finishAuction(uint _tokenId) public {
-      require(auction[_tokenId].startedTime + auctionDuration >= block.timestamp, "Error: Cannot finish this auction while 3 days aren't run out!");
-      if(auction[_tokenId].bets >= 2){
-        _transferERC20(auction[_tokenId].owner, auction[_tokenId].currentPrice);
-        _transferERC721(auction[_tokenId].bidder, _tokenId);
-        emit AuctionFinished(auction[_tokenId].owner, auction[_tokenId].bidder, _tokenId, auction[_tokenId].currentPrice);
-      }else{
-        if(auction[_tokenId].bets != 0){
-          _transferERC20(auction[_tokenId].bidder, auction[_tokenId].currentPrice);
-        }
-          _transferERC721(auction[_tokenId].owner, _tokenId);
-          emit AuctionCancled(auction[_tokenId].owner, _tokenId);
-      }
-      delete auction[_tokenId];
+      _finishAuction(_tokenId);
+  }
+
+  function _finishAuction(uint _tokenId) internal {
+  require(auction[_tokenId].startedTime + auctionDuration <= block.timestamp, "Error: Cannot finish this auction while 3 days aren't run out!");
+  if(auction[_tokenId].bets >= 2){
+    _transferERC20(auction[_tokenId].owner, auction[_tokenId].currentPrice - (auction[_tokenId].currentPrice/100)*fee);
+    _transferERC721(auction[_tokenId].bidder, _tokenId);
+    emit AuctionFinished(auction[_tokenId].owner, auction[_tokenId].bidder, _tokenId, auction[_tokenId].currentPrice);
+  }else{
+    if(auction[_tokenId].bets != 0){
+      _transferERC20(auction[_tokenId].bidder, auction[_tokenId].currentPrice);
+    }
+      _transferERC721(auction[_tokenId].owner, _tokenId);
+      emit Auctioncanceled(auction[_tokenId].owner, _tokenId);
+  }
+  delete auction[_tokenId];
   }
 
 }

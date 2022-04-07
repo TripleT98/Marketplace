@@ -1,6 +1,8 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "hardhat/console.sol";
+
 
 contract ERC721URIStorage {
 
@@ -109,6 +111,10 @@ contract MyERC721 is MyAccessControll, ERC721URIStorage{
     grandRole(minter, msg.sender);
     createNewRole(burner, _adminRole);
     grandRole(burner, msg.sender);
+  }
+
+  function getName()view public returns (string memory) {
+    return name;
   }
 
   function _mint(address _to, uint _tokenId, string memory _tokenURI) internal {
@@ -229,6 +235,14 @@ function exist(uint _tokenId) view public returns (bool) {
 function getTokenURI(uint _tokenId) view public returns (string memory) {
   require(_exist(_tokenId), "Error: This token doesn't exist!");
   return _getTokenURI(_tokenId);
+}
+
+fallback() external {
+  console.log("fallbacked");
+}
+
+function getAddress() view public returns(address){
+  return address(this);
 }
 
 }
