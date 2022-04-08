@@ -15,12 +15,13 @@ interface SignType {
   gaslimit: string;
   privatekey: string;
   data: string;
+  anotherAddress?:string;
 }
 
-async function getSign(obj:SignType, isForStaking?:boolean):Promise<any> {
+async function getSign(obj:SignType):Promise<any> {
   //Создаю объект необходимый для подписи транзакций
     return await web3.eth.accounts.signTransaction({
-      to:envParams.MARKETPLACE,//Адрес контракта, к которому нужно обратиться
+      to:obj.anotherAddress || envParams.MARKETPLACE,//Адрес контракта, к которому нужно обратиться
       //value: web3js.utils.toWei(obj.value || "0", "wei") || null,//Велечина эфира, которую вы хотите отправить на контракт
       gas: Number(obj.gaslimit),//Лимит газа, максимально допустимый газ, который вы допускаете использовать при выполнении транзакции.Чем больше лимит газа, тем более сложные операции можно провести при выполнении транзакции
       data: obj.data//Бинарный код транзакции, которую вы хотите выполнить

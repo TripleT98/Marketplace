@@ -6,7 +6,7 @@ type MintAgs = {
   uri: string;
 }
 
-export async function mintTask(){
+export default async function mintTask(){
 
   task("mint", "Create item on marketplace")
   .addParam("privatekey","your PRIVATE KEY")

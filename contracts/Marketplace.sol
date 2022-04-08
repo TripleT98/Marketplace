@@ -87,7 +87,7 @@ contract Marketplace{
   }
 
   function listItem(uint _tokenId, uint _price) public {
-
+    require(listing[_tokenId].price == 0, "Error: This item is already on sale! But if u want u can change the item's price!");
     _transferFromERC721(msg.sender, address(this), _tokenId);
 
     listing[_tokenId].price = _price;
@@ -95,6 +95,11 @@ contract Marketplace{
 
     emit ItemListed(msg.sender, _tokenId, _price);
 
+  }
+
+  function changeItemPrice(uint _tokenId, uint _newPrice) public IsOnSale(_tokenId){
+    require(listing[_tokenId].owner == msg.sender, "Error: Can't change price of this token because u're not owner of it!");
+    listing[_tokenId].price = _newPrice;
   }
 
   function getPriceOfListedItem(uint _tokenId) view public returns (uint){
@@ -107,7 +112,7 @@ contract Marketplace{
   function _transferERC20(address _to, uint _amount) internal {
 
     (bool success,) = currency.call(abi.encodeWithSignature("transfer(address,uint256)", _to, _amount));
-    require(success, "Error: Can't transfer your token! Something is wrong!");
+    require(success, "Error: Can't transfer your tokens! Something is wrong!");
 
   }
 
@@ -122,7 +127,7 @@ contract Marketplace{
      uint allowance = abi.decode(data,(uint));
      require(allowance >= _amount, "Error: To buy item you have to allow to withdraw some tokens!");
      (success,) = currency.call(abi.encodeWithSignature("transferFrom(address,address,uint256)", _from, _to, _amount));
-     require(success, "Error: Can't transferFrom your token! Something is wrong!");
+     require(success, "Error: Can't transferFrom your tokens! Something is wrong!");
   }
 
   function _transferFromERC721(address _from, address _to, uint _tokenId) internal {
@@ -154,8 +159,9 @@ contract Marketplace{
   }
 
   function listItemOnAuction(uint _tokenId, uint _startedPrice, uint _minOdds) public {
-    _transferFromERC721(msg.sender, address(this), _tokenId);
     Auction storage auctionParams = auction[_tokenId];
+    require(auctionParams.owner == address(0), "Error: This item is already listed on auction!");
+    _transferFromERC721(msg.sender, address(this), _tokenId);
     auctionParams.owner = msg.sender;
     auctionParams.currentPrice = _startedPrice;
     auctionParams.minOdds = _minOdds;

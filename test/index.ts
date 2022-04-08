@@ -137,6 +137,14 @@ describe("Testing marketplace functions", function () {
 
   })
 
+  it("Testing changeItemPrice function", async()=>{
+    await marketplace.connect(owner).createNewItem(getUri(0));
+    await approveERC721(owner, marketplace.address, 0);
+    await marketplace.connect(owner).listItem(0, tokenPrice);
+    await marketplace.connect(owner).changeItemPrice(0, tokenPriceX2);
+    expect(String(await marketplace.getPriceOfListedItem(0))).to.equal(tokenPriceX2);
+  })
+
   it("Testing buyItem function", async()=>{
     await mintAndApproveERC20([user1],[tokenPrice]);
     await marketplace.connect(owner).createNewItem(getUri(0));
@@ -347,13 +355,34 @@ describe("Testing marketplace functions", function () {
       await expect(marketplace.finishAuction(0)).to.be.revertedWith(err_mess);
     })
 
-  /*  it("Testing mint function with wrong args", async()=>{
-      await expect(erc20.connect(user1).mint(user1.address, tokenPrice)).to.be.reverted;
-    })*/
-
     it("If somebody exept owner tries to change fee value", async()=>{
       let err_mess: string = "Error: You are not owner!";
       await expect(marketplace.connect(user1).setFee(2)).to.be.revertedWith(err_mess);
+    })
+
+    it("Trying to list item wich already is on sale", async()=>{
+      let err_mess: string = "Error: This item is already on sale! But if u want u can change the item's price!";
+      await marketplace.connect(owner).createNewItem(getUri(0));
+      await approveERC721(owner, marketplace.address, 0);
+      await marketplace.connect(owner).listItem(0, tokenPrice);
+      await expect(marketplace.connect(owner).listItem(0, tokenPrice)).to.be.revertedWith(err_mess);
+    })
+
+    it("Trying to change another's item's price", async()=>{
+      let err_mess: string = "Error: Can't change price of this token because u're not owner of it!";
+      await marketplace.connect(owner).createNewItem(getUri(0));
+      await approveERC721(owner, marketplace.address, 0);
+      await marketplace.connect(owner).listItem(0, tokenPrice);
+      await expect(marketplace.connect(user1).changeItemPrice(0, tokenPriceX2)).to.be.revertedWith(err_mess);
+      expect(String(await marketplace.getPriceOfListedItem(0))).to.equal(tokenPrice);
+    })
+
+    it("Trying to list one item on auction twice", async()=>{
+      let err_mess: string = "Error: This item is already listed on auction!";
+      await marketplace.connect(owner).createNewItem(getUri(0));
+      await approveERC721(owner, marketplace.address, 0);
+      await marketplace.connect(owner).listItemOnAuction(0, tokenPrice, String(Number(tokenPrice)/10));
+      await expect(marketplace.connect(owner).listItemOnAuction(0, tokenPrice, String(Number(tokenPrice)/10))).to.be.revertedWith(err_mess);
     })
 
   })
